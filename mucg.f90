@@ -483,12 +483,12 @@
 !
 !-----------------------------------------------------------------------      
 ! WSTINE
-    subroutine wstine(j,dt4,dfpro,ws,ws1,sz,t0,R)
+    subroutine wstine(j,dt4,dfpro,ws,ws1,sz,t0)
     implicit none
     integer, intent(in) :: j, sz
     integer :: i,k
     real(8), intent(in), dimension(sz) :: dt4, dfpro
-    real(8), intent(in) :: R, t0
+    real(8), intent(in) :: t0
     real(8), intent(out) :: ws,ws1
     real(8) :: v14
     k=0 
@@ -811,7 +811,7 @@
     print 17
     print 14
     print 18
-    call wstine(j,dt4,dfpro,ws,ws1,sz,t0,R)
+    call wstine(j,dt4,dfpro,ws,ws1,sz,t0)
 !
 ! Modification made February 1991 to allow for large carbon concentrations
 ! Based on Metal Science paper on thermodynamics of martensitic transformations
@@ -843,7 +843,7 @@
 14  format ('----------------------------------------------------------------------------------------------')
 15  format ('   FPRO   FPROA    GMAX   CTEMP',12H   X NUCLEUS,6H  FSON,9H      XEQ,10H    XEQ50 ,&
      &6H   FTO,9H      XTO,11H      X44  ,8H XTO400 ,13H    SHEART   ,10H  DIFFT   )
-16 format (1H ,F8.1,2F8.1,F7.1,D10.2,F8.1,2F9.4,F8.1,F8.5,1H ,2F8.5,1H ,D11.2,D11.2)
+16 format (1H ,F8.1,2F8.1,F7.1,E10.2,F8.1,2F9.4,F8.1,F8.5,1H ,2F8.5,1H ,E11.2,E11.2)
 17 format (4H    )
 18 format ('    ***** FTO versus TEMPERATURE *****   '/)
 19 format (' Widmanstatten start temperature range ',F7.1,' C & ',F7.1,' C')
