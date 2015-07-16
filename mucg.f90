@@ -731,7 +731,7 @@
         xto400=xto400+1d-4
         x44=0.3*xeq
         temp=dble(i)
-        ctemp=temp-t0
+        ctemp=temp-dble(int(t0))
         if (temp <= 1000d0) then
             h1=111918.0d+00
             s1=51.44d+00
@@ -765,7 +765,7 @@
 ! If V14=0, goto 18.
         v14=wsfun(temp,t0)
         if (v14>=0d0) then
-            x44 = 99999999999.99999
+            x44=99999999999.99999
         else
             do !14
                 a44=cg(x44,temp,W,R)
@@ -853,8 +853,4 @@
 !
    end program mucg
 !
-!
-
-!
 !-----------------------------------------------------------------------      
-!
