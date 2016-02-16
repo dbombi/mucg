@@ -153,8 +153,8 @@
 9   format (6x, 'Tensile pre-strain in mm/mm?')
 10  format (6x, 'Compressive pre-strain in mm/mm?')
 11  format ('----------------------------------------------------------------------------------------------'/)
-12  format (6x,'Austenite GS=Unknown, Applied stress=',f6.0,' Pre-strain=',f6.2/)
-13  format (6x,'Austenite GS=',f6.0,' Applied stress=',f6.0,' Pre-strain=',f6.2/)
+12  format (6x,'Austenite GS= Default (40 micron), Applied stress=',f6.0,' MPa Pre-strain=',f6.2' mm/mm'/)
+13  format (6x,'Austenite GS=',f6.0,' Applied stress=',f6.0,' MPa  Pre-strain=',f6.2' mm/mm'/)
     end subroutine mech
 !
 !--------------------------------------------------------------------------    
@@ -279,9 +279,9 @@
 !
 !-----------------------------------------------------------------------      
 !
-    function energy(temp,t10,t20)
+    function energy(temp,t10,t20,stored)
     implicit none
-    real(8), intent(in) :: temp,t10,t20
+    real(8), intent(in) :: temp,t10,t20,stored
     real(8) :: energy
     real(8) :: f,t7,t8
 !
@@ -294,7 +294,9 @@
     if (t7<300) f=1.38*T7-1499.0
     if (t7<700 .and. T7>=300)  f=1.65786*t7-1581d0
     if (t7<940 .and. T7>=700)  f=1.30089*t7-1331d0
-    energy=(141d0*T10 + F)*4.187
+    energy=(141d0*T10 + f)*4.187
+! Decresase stability of austenite
+    energy=energy-stored
     end function energy
 !
 !-----------------------------------------------------------------------
@@ -355,9 +357,9 @@
     if (x > 0.32D-03) x=0.32D-03
 ! Estimation complete
 !
-    aj1=1.0D+00-EXP(-W1/(R*temp))
+    aj1=1.0D+00-exp(-W1/(R*temp))
     do
-        d1=SQRT(9.0D+00-6.0D+00*X*(2.0D+00*AJ1+3.0D+00)+(9.0D+00+16.0D+00*AJ1)*X**2)
+        d1=sqrt(9.0D+00-6.0D+00*X*(2.0D+00*AJ1+3.0D+00)+(9.0D+00+16.0D+00*AJ1)*X**2)
         b1=((D1-3.0D+00+5.0D+00*X)/(D1+3.0D+00-5.0D+00*X))
         b2=((3.0D+00-4.0D+00*X)/X)
         b3=(H1-S1*temp + 4.0D+00*W1)/(R*temp)
@@ -429,7 +431,7 @@
         c(iu)=c(iu)/b1
     enddo
     xbar=c(1)
-    xbar=(int(10000.0D+00*XBAR))/10000
+    xbar=(int(10000.0D+00*xbar))/10000
     t10=y(3)*(-3)+y(4)*2+y(5)*12+y(6)*(-9)+y(7)*(-1)+y(8)*(-12)+y(9)*3.5+y(10)*7+y(11)*(-7)+y(12)*(-9)
     t20=-3*y(3)-37.5*y(4)-6*y(5)-26*y(6)-19*y(7)-44*y(8)+19.5*y(9)-4.5*y(10)+8*y(11)-26*y(12)
 !
@@ -647,8 +649,8 @@
     corr=1.0e+00
     slope=1.0e+00
     bainstr=-400e0
-!    marstr=-1120e0-10568e0*x1+941e-1
-    marstr=-1086.9d0+2941.8d0*x1-9.6016d5*x1**2+2.5382d7*x1**3-1.8488d8*x1**4+mechd-mechsta
+    marstr=-1120d0-10568d0*x1+94.1d0+mechd-mechsta
+!!    marstr=-1086.9d0+2941.8d0*x1-9.6016d5*x1**2+2.5382d7*x1**3-1.8488d8*x1**4+mechd-mechsta
 !
     do i=1,j
         if(y(i)<marstr) then
@@ -674,48 +676,48 @@
         ms=(marstr-const)/slope
         !if (ms<-273.15) ms=-273.15
     endif
-    end subroutine msbstemp   
+    end subroutine msbstemp
 !
-    end module parsubfuns
-!--------------------------------------------------------------------------    
-    program mucg
-! Program for prediction of TTT digrams
-! Based on MAP programs MUCG46B, MUCG83
-    use parsubfuns
+!-----------------------------------------------------------------------      
+! Main subroutine
+    subroutine mucg(c,ws,bs,ms,stored,mechd,mechsta,gs1,step,prn,stctemp,stxeq,stxeq2)
     implicit none
 ! Variables
-    integer :: i, j, step, j98, j99, jn
-    real(8), dimension(12) :: c
+    integer, intent(in) :: step
+    integer :: i, j, j98, j99, jn
+    logical, intent(in) :: prn
+    logical :: dat
+    real(8), intent(inout), dimension(12) :: c
+    real(8), intent(out), dimension(sz) :: stctemp, stxeq, stxeq2
     real(8), dimension(sz) :: bdif, bsh, btem, dfpro, ddfto, dt4, dxq
-    real(8) :: mechd, mechsta, gs1
+    real(8), intent(in) :: mechd, mechsta, gs1, stored
+    real(8), intent(out) :: ws, bs, ms
     real(8) :: xto, xto400, x44, x1, x, xeq, xeq2
     real(8) :: temp, ctemp
-    real(8) :: h1, s1, t10, t20,  v14, w, ws, ws1, f, f44
+    real(8) :: h1, s1, t10, t20,  v14, w, ws1, f, f44
     real(8) :: a, a1, a44, aeq, afe, afeq, afe44, aj, aj1
-    real(8) :: bs, ms, ms0, da44, dafe44, df441, difft
+    real(8) :: ms0, da44, dafe44, df441, difft
     real(8) :: eteq, eteq2, fpro, fproa, fson, fto, gmax
     real(8) :: sheart, teq, teq2, xms, xbar
-! Initialization of variables
-    c=0d0
-    mechd=0d0
-    mechsta=0d0
-    gs1=0d0
-    step = 2 ! Main loop temperature step
+! Inicialization of variables
+    dat = .false. !Don't write to file
+!Write results to file
+    if (dat) then
 ! Open file for TTT diagram
     open(unit=2,file='ttt.txt')
-    write(2,*) "CTEMP, SHEART, DIFFT"
-! Read input parameters
-    call composition(c) ! Reads composition 
-    call mech(mechd,mechsta,gs1) ! Reads mechanical properties
+!    write(2,*) "CTEMP, SHEART, DIFFT"
+    endif
 !
     call omega(c,w,xbar,t10,t20,0)
     x1=c(2)
-    print 10
-    write(*,11) c(2:7)
-    write(*,12) c(8:12),c(1)
-    write(*,13) x1,t10,t20,W
-    print 14
-    print 15
+    if (prn) then
+        print 10
+        write(*,11) c(2:7)
+        write(*,12) c(8:12),c(1)
+        write(*,13) x1,t10,t20,w
+        print 14
+        print 15
+    endif
     j=0
     fto=-1e0
     xeq=0.2d+00 !Paraequilibrium carbon concentration of austenite in mole fraction
@@ -736,16 +738,16 @@
             h1=111918.0d+00
             s1=51.44d+00
         else
-            h1=105525.0D+00
-            s1=45.34521D+00
+            h1=105525.0d+00
+            s1=45.34521d+00
         endif
-        f=energy(temp,t10,t20)
-        aj=1d0-exp(-W/(R*temp))
-        aj1=1d+0-exp(-W1/(R*temp))
+        f=energy(temp,t10,t20,stored)
+        aj=1d0-exp(-w/(r*temp))
+        aj1=1d+0-exp(-w1/(r*temp))
         do !8
-            teq=R*temp*afeg(xeq,aj)-F
+            teq=R*temp*afeg(xeq,aj)-f
             if (abs(teq)<1d0) exit
-            eteq=DAFEG(xeq,aj)*R*temp
+            eteq=dafeg(xeq,aj)*R*temp
             xeq=xeq-teq/eteq
         enddo
         do !10
@@ -765,7 +767,7 @@
 ! If V14=0, goto 18.
         v14=wsfun(temp,t0)
         if (v14>=0d0) then
-            x44=99999999999.99999
+            x44 = 99999999999.99999
         else
             do !14
                 a44=cg(x44,temp,W,R)
@@ -794,10 +796,19 @@
         call axto(H,S,H1,S1,XTO400,temp,W,W1,F,AJ,AJ1,400.0D+00,JN,J99,R)
         call tttt(temp,GMAX,SHEART,DIFFT,R)
         if (x44==0d0) sheart=1d+20
-        write(*,16) FPRO,FPROA,GMAX,CTEMP,X,FSON,XEQ,XEQ2,FTO,XTO,X44,XTO400,SHEART,DIFFT
+        if (prn) then
+            write(*,16) FPRO,FPROA,GMAX,CTEMP,X,FSON,XEQ,XEQ2,FTO,XTO,X44,XTO400,SHEART,DIFFT
+        endif
+        if (dat) then
+            write(2,16) FPRO,FPROA,GMAX,CTEMP,X,FSON,XEQ,XEQ2,FTO,XTO,X44,XTO400,SHEART,DIFFT
+        endif
 !
+! Output for structure
+        stxeq(j)=xeq
+        stxeq2(j)=xeq2
+        stctemp(j)=ctemp      
 ! Plot 
-        write(2,"(f8.2,2f10.4)") ctemp, log(SHEART), log(DIFFT)
+!        write(2,"(f8.2,2f10.4)") ctemp, log(SHEART), log(DIFFT)
         bsh(j)=sheart
         bdif(j)=difft
         btem(j)=ctemp
@@ -805,12 +816,14 @@
         dxq(j)=xeq
         ddfto(j)=fto
         dt4(j)=ctemp
-        dfpro(j)=FPRO     
+        dfpro(j)=fpro     
     enddo !loop 27
     j=j-1 !j8
-    print 17
-    print 14
-    print 18
+    if (prn) then
+        print 17
+        print 14
+        print 18
+    endif
     call wstine(j,dt4,dfpro,ws,ws1,sz,t0)
 !
 ! Modification made February 1991 to allow for large carbon concentrations
@@ -820,37 +833,42 @@
     if (xms>0.0594d0) xms=0.0594d0
     call msbstemp(j,dt4,ddfto,xms,mechd,mechsta,sz,ms,bs)
     ms0=1d0/0.2689*log(1/(4/3*3.141593*(40*1.0D-3/2)**3)*(exp(-log(0.99)/0.05)-1)+1)+ms
-    ms=ms0-1d0/0.2689*log(1/(4/3*3.141593*(GS1*1.0D-3/2)**3)*(exp(-log(0.99)/0.05)-1)+1)
+    ms=ms0-1d0/0.2689*log(1/(4/3*3.141593*(gs1*1.0D-3/2)**3)*(exp(-log(0.99)/0.05)-1)+1)
 !   
-    write(*,19) ws1,ws
+    if (prn) write(*,19) ws1,ws
     if (ws<bs) then
         bs=ws
-        write(*,20) bs
+        if (prn) write(*,20) bs
     else
-        write(*,21) bs
+        if (prn) write(*,21) bs
     endif
+    if (prn) then
     write(*,22) ms
     print 14
+    endif
 !
-    write(2,*) "ws1, ws, bs, ms"
-    write(2,"(4f8.2)") ws1, ws, bs, ms
-    close(2)
+    if (dat) then
+        write(2,*) "ws1, ws, bs, ms"
+        write(2,"(4f8.2)") ws1, ws, bs, ms
+        close(2)
+    endif
+!
 ! Format statements
 10  format (6x, 'Entered chemical composition in at. %')
 11  format (8H      C=,f8.4, 6H   Si=,f8.4, 6H   Mn=,f8.4, 6H   Ni=,f8.4, 6H   Mo=,f8.4, 6H   Cr=,f8.4)
 12  format (8H      V=,f8.4, 6H   Co=,f8.4, 6H   Cu=,f8.4, 6H   Al=,f8.4, 6H   W= ,f8.4, 6H   Fe=,f8.4/)
-13   format (21H      CARBON CONTENT=,F10.5,6H  T10=,F10.6,6H  T20=,F10.6,10H   WGAMMA=,F7.0/)
+13   format (21H      Carbon content=,f10.5,6H  T10=,f10.6,6H  T20=,f10.6,10H   WGamma=,f7.0/)
 14  format ('----------------------------------------------------------------------------------------------')
 15  format ('   FPRO   FPROA    GMAX   CTEMP',12H   X NUCLEUS,6H  FSON,9H      XEQ,10H    XEQ50 ,&
      &6H   FTO,9H      XTO,11H      X44  ,8H XTO400 ,13H    SHEART   ,10H  DIFFT   )
-16 format (1H ,F8.1,2F8.1,F7.1,E10.2,F8.1,2F9.4,F8.1,F8.5,1H ,2F8.5,1H ,E11.2,E11.2)
+16 format (1H ,F8.1,2F8.1,F7.1,D10.2,F8.1,2F9.4,F8.1,F8.5,1H ,2F8.5,1H ,E11.2,E11.2)
 17 format (4H    )
 18 format ('    ***** FTO versus TEMPERATURE *****   '/)
 19 format (' Widmanstatten start temperature range ',F7.1,' C & ',F7.1,' C')
 20 format (' Nucleation limited bainite start temperature=',F7.1,' C')
 21 format (' Growth limited bainite start temperature=',F7.1,' C')
 22 format (' Martensite start temperature=',F7.1,' C')
+    end subroutine mucg
 !
-   end program mucg
-!
-!-----------------------------------------------------------------------      
+    end module parsubfuns
+!--------------------------------------------------------------------------
